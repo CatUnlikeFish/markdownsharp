@@ -36,7 +36,7 @@ namespace MarkdownSharp.Extensions.Mal
         {
             string categories = match.Groups[1].Value;                  // people|manga..
             string num = match.Groups[2].Value;                         // num section
-            string title = WebUtility.UrlDecode(match.Groups[3].Value); // title e.g Kitamura_Eri
+            string title = Uri.UnescapeDataString(match.Groups[3].Value); // title e.g Kitamura_Eri
 
             return String.Format(
                 "[mal://{0}](http://myanimelist.net/{1}/{2}/{0})", 
