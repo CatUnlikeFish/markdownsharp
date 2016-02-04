@@ -25,6 +25,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+using System.Linq;
 using MarkdownSharp.Extensions;
 using System;
 using System.Collections.Generic;
@@ -343,12 +344,39 @@ namespace MarkdownSharp
             text = StripLinkDefinitions(text);
             text = RunBlockGamut(text);
             text = Unescape(text);
+            text = RunToC(text);
 
             Cleanup();
 
             return text;
         }
 
+        static Regex _tocRegex = new Regex(@"\{\{TOC(?<maxlevel>:\d)?\}\}");
+
+        string RunToC(string text)
+        {
+            return _tocRegex.Replace(text, ToCEvaluator);
+        }
+
+        string ToCEvaluator(Match match)
+        {
+            var maxLevel = Int32.MaxValue;
+
+            if (match.Groups["maxlevel"].Success)
+                maxLevel = Int32.Parse(match.Groups["maxlevel"].Value);
+
+            var sb = new StringBuilder();
+
+            foreach (var header in _headers.OrderBy(h => h.Item4).Where(h => h.Item4 > match.Index))
+            {
+                if (header.Item3 > maxLevel)
+                    continue;
+
+                sb.AppendFormat("<a href='#{0}' style='margin-left: {2}mm'>{1}</a><br/>", header.Item2, header.Item1, header.Item3 * 5);
+            }
+
+            return sb.ToString();
+        }
 
         /// <summary>
         /// Perform transformations that form block-level tags like paragraphs, headers, and list items.
@@ -1133,18 +1161,29 @@ namespace MarkdownSharp
             return text;
         }
 
+        int _sectionCounter;
+        readonly List<Tuple<string, string, int, int>> _headers = new List<Tuple<string, string, int, int>>();
+
         private string SetextHeaderEvaluator(Match match)
         {
             string header = match.Groups[1].Value;
             int level = match.Groups[2].Value.StartsWith("=") ? 1 : 2;
-            return string.Format("<h{1}>{0}</h{1}>\n\n", RunSpanGamut(header), level);
+
+            var anchor = "sec" + _sectionCounter++;
+            _headers.Add(Tuple.Create(header, anchor, level, match.Index));
+
+            return string.Format("<h{1}><a id='{2}'>{0}</a></h{1}>\n\n", RunSpanGamut(header), level, anchor);
         }
 
         private string AtxHeaderEvaluator(Match match)
         {
             string header = match.Groups[2].Value;
             int level = match.Groups[1].Value.Length;
-            return string.Format("<h{1}>{0}</h{1}>\n\n", RunSpanGamut(header), level);
+
+            var anchor = "sec" + _sectionCounter++;
+            _headers.Add(Tuple.Create(header, anchor, level, match.Index));
+
+            return string.Format("<h{1}><a id='{2}'>{0}</a></h{1}>\n\n", RunSpanGamut(header), level, anchor);
         }
 
 
